@@ -30,45 +30,45 @@ def generate_observations(graph: Graph, obs: int, dims: int, cube_url: str):
 
         for dim in range(dims):
             dim_path = cube_url + f"dimensions/dim-{dim}"
-            graph.add((URIRef(obs_url), URIRef(dim_path), Literal(random.uniform(0, 1), datatype=XSD.decimal)))
+            graph.add((URIRef(obs_url), URIRef(dim_path), Literal(random.uniform(0.1, 1), datatype=XSD.decimal)))
 
 
-def generate_shape(graph: Graph, cube_url: str, dims: int):
-    graph.add((URIRef(cube_url + "shape/"), RDF.type, SH.NodeShape))
-    graph.add((URIRef(cube_url + "shape/"), RDF.type, cube.Constraint))
-    graph.add((URIRef(cube_url + "shape/"), SH.closed, Literal(True, datatype=XSD.boolean)))
+def generate_shape(shape: Graph, cube_url: str, dims: int):
+    shape.add((URIRef(cube_url + "shape/"), RDF.type, SH.NodeShape))
+    shape.add((URIRef(cube_url + "shape/"), RDF.type, cube.Constraint))
+    shape.add((URIRef(cube_url + "shape/"), SH.closed, Literal(True, datatype=XSD.boolean)))
 
     # Constraint for "sh.path rdf.type"
     type_node = BNode()
-    graph.add((URIRef(cube_url + "shape/"), SH.property, type_node))
-    graph.add((type_node, SH.path, RDF.type))
-    graph.add((type_node, SH.nodeKind, SH.IRI))
+    shape.add((URIRef(cube_url + "shape/"), SH.property, type_node))
+    shape.add((type_node, SH.path, RDF.type))
+    shape.add((type_node, SH.nodeKind, SH.IRI))
     possible_type_nodes = BNode()
-    graph.add((type_node, SH + "in", possible_type_nodes))
-    Collection(graph, possible_type_nodes, [cube.Observation])
+    shape.add((type_node, SH + "in", possible_type_nodes))
+    Collection(shape, possible_type_nodes, [cube.Observation])
 
     for dim in range(dims):
         dim_path = cube_url + f"dimensions/dim-{dim}"
         bnode = BNode()
-        graph.add((URIRef(cube_url + "shape/"), SH.property, bnode))
-        graph.add((bnode, SH.path, URIRef(dim_path)))
-        graph.add((bnode, SH.minCount, Literal(1)))
-        graph.add((bnode, SH.maxCount, Literal(1)))
-        graph.add((bnode, qudt.scaleType, qudt.IntervalScale))
+        shape.add((URIRef(cube_url + "shape/"), SH.property, bnode))
+        shape.add((bnode, SH.path, URIRef(dim_path)))
+        shape.add((bnode, SH.minCount, Literal(1)))
+        shape.add((bnode, SH.maxCount, Literal(1)))
+        shape.add((bnode, qudt.scaleType, qudt.IntervalScale))
 
         # datatype: either cube:undefined or xsd:decimal with maxInclusive and minInclusive
         or_node = BNode()
-        graph.add((bnode, SH + "or", or_node))
+        shape.add((bnode, SH + "or", or_node))
 
         undefined_node = BNode()
-        graph.add((undefined_node, SH.datatype, cube.Undefined))
+        shape.add((undefined_node, SH.datatype, cube.Undefined))
 
         defined_node = BNode()
-        graph.add((defined_node, SH.maxInclusive, Literal(1)))
-        graph.add((defined_node, SH.minInclusive, Literal(0)))
-        graph.add((defined_node, SH.datatype, XSD.decimal))
+        shape.add((defined_node, SH.maxInclusive, Literal(1)))
+        shape.add((defined_node, SH.minInclusive, Literal(0)))
+        shape.add((defined_node, SH.datatype, XSD.decimal))
 
-        Collection(graph, or_node, [undefined_node, defined_node])
+        Collection(shape, or_node, [undefined_node, defined_node])
 
 
 def main():
@@ -89,12 +89,16 @@ def main():
     graph.bind("qudt", qudt)
 
     generate_cube(graph=graph, cube_url=cube_url, dims=args.dims, obs=args.obs)
-
     generate_observations(graph=graph, dims=args.dims, obs=args.obs, cube_url=cube_url)
-
-    generate_shape(graph=graph, cube_url=cube_url, dims=args.dims)
-    print(ROOT_DIR + f"/examples/{args.dims}-{args.obs}.ttl")
     graph.serialize(destination=ROOT_DIR + f"/examples/{args.dims}-{args.obs}.ttl", format="turtle")
+
+    shape = Graph()
+    shape.bind("cube", cube)
+    shape.bind("schema", schema)
+    shape.bind("test", Namespace("https://environment.ld.admin.ch/foen/nfi/test/"))
+    shape.bind("qudt", qudt)
+    generate_shape(shape=shape, cube_url=cube_url, dims=args.dims)
+    shape.serialize(destination=ROOT_DIR + f"/examples/shape-{args.dims}-{args.obs}.ttl", format="turtle")
 
 
 if __name__ == "__main__":
